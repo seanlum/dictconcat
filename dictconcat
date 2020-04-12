@@ -1,0 +1,83 @@
+#!/usr/bin/python3
+# Written by seanlum
+# 04-12-2020
+import os
+import re
+import time
+import argparse
+
+def get_all_files_in_dir(storage, path):
+    try:
+        entries = [ e for e in os.scandir(path) ]
+    except FileNotFoundError:
+        print('Could not open directory: "' + path + '"  for searching.')
+        exit()
+    for entry in entries:
+        if entry is None:
+            pass
+        if entry.is_dir():
+            for sub in os.scandir(entry.path):
+                entries.append(sub)
+        elif (entry.is_file()):
+            storage.append(entry.path)
+
+
+def get_last_word_of_each_line_in_file(storage, files):
+    for path in files:
+        if path.endswith('.txt'):
+            print(time.asctime(time.localtime()) + ' Total words [' + str(len(storage)) + ']... Getting words from ' + path)
+            file = open(path, 'r', encoding='utf-8', errors='ignore')
+            contents = file.read().splitlines()
+            file.close()
+            index = 0
+            for word in contents:
+                index = index + 1
+                if index % 100000 == 0:
+                    print(time.asctime(time.localtime()) + ' Total words [' + str(len(storage)) + ']...... Got ' + str(index) + ' words from ' + path)
+                line = [x for x in re.split(r'[\ \t\s]', word.strip()) if len(x) > 0]
+                if len(line) > 0:
+                    word = line[len(line) - 1].strip()
+                    storage.append(word)
+
+
+def write_the_big_dict(dictionary_file, search_directory=None, append=False, include_file=None):
+    files = []
+    words = []
+    if search_directory is not None:
+        get_all_files_in_dir(files, search_directory)
+        get_last_word_of_each_line_in_file(words, files)
+    if include_file is not None:
+        get_last_word_of_each_line_in_file(words, [include_file])
+    if append is True and os.path.exists(dictionary_file):
+        print(time.asctime(time.localtime()) + ' Reading in existing dictionary: ' + dictionary_file)
+        get_last_word_of_each_line_in_file(words, [dictionary_file])
+    print(time.asctime(time.localtime()) + ' Processing ' + str(len(words)) + ' words...')
+    result = list(set(words))
+    result.sort()
+    print(time.asctime(time.localtime()) + ' Processed ' + str(len(result)) + ' unique words...')
+    if not os.path.exists(dictionary_file):
+        os.mknod(dictionary_file)
+    with open(dictionary_file, 'w+b') as output_file:
+        output_file.write(bytes("\n".join(result), 'utf-8'))
+        print(time.asctime(time.localtime()) + ' Wrote ' + str(len(result)) + ' unique words to ' + dictionary_file + '...')
+        output_file.close()
+
+
+parser = argparse.ArgumentParser(description="Dictionary Concatinator, the tool for concatenating dictionaries.")
+parser.add_argument(dest='dictionary_path', metavar='<dictionary_path>')
+parser.add_argument('-f', dest='include_file', metavar='<include_file>', type=str, help="File read into <dictionary_path>")
+parser.add_argument('-d', dest='search_directory', metavar='<search_directory>', type=str, help="Directory to search. Default depth is infinite")
+# TODO
+# parser.add_argument('-max-depth', metavar='<depth>', type=int, help="Maximum depth of directory search.")
+# parser.add_argument('-min-depth', metavar='<depth>', type=int, help="Minimum depth of directory search.")
+parser.add_argument('-a', '--append', dest='append', action='store_true', help="Append results to <dictionary_path>, if -a is not specified <dictionary_path> will be truncated.")
+args = parser.parse_args()
+
+if args.search_directory is not None:
+    print("Searching in directory: " + args.search_directory)
+
+if args.append is True:
+    print("Including dictionary file in results: " + args.dictionary_path)
+
+if args.dictionary_path is not None:
+    write_the_big_dict(args.dictionary_path, args.search_directory, args.append, args.include_file)
